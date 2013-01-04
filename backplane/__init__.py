@@ -7,7 +7,7 @@ import logging
 import base64
 import urllib
 import json
-import httplib2
+import requests
 
 __version__ = '0.1'
 __author__ = 'George Katsitadze'
@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 def debug(enable = True, level = 1):
     """Turn on debug output for the module."""
-    httplib2.debuglevel = level
     logging.basicConfig(level=logging.DEBUG)
 
 def channel_from_scope(scope):
@@ -293,7 +292,7 @@ def _get_token(creds, scope = None, grant_type = 'client_credentials'):
     if grant_type == 'refresh_token':
         data['refresh_token'] = creds.token.refresh_token
 
-    content = _call_backplane(url, 'POST', urllib.urlencode(data), headers)
+    content = _call_backplane(url, 'POST', data, headers)
     return _json_to_token(content)
 
 def _get_regular_token(server_url, bus):
@@ -307,11 +306,16 @@ def _get_regular_token(server_url, bus):
 
     return _json_to_token(jsn)
 
-def _call_backplane(url, method, body = None, headers = None, extra = 0):
-    #h = httplib2.Http(timeout = TIMEOUT + extra, disable_ssl_certificate_validation=True)
-    h = httplib2.Http(timeout = TIMEOUT + extra)
+
+def _call_backplane(url, method, data = None, headers = None, extra = 0):
+    # map request methods to instance methods of requests module
+    # included inline in order to use with mock
+    REQUEST_METHOD_TO_INSTANCE_METHOD = dict(GET=requests.get,
+                                             POST=requests.post)
+    instance_method = REQUEST_METHOD_TO_INSTANCE_METHOD[method]
     try:
-        resp, content = h.request(url, method, body, headers)
+        resp = instance_method(url, data=data, headers=headers, timeout=TIMEOUT + extra)
+        content = resp.text
     except:
         msg = str(sys.exc_info()[1])
         logger.error('call to %s failed: ' % url + msg)
@@ -320,7 +324,7 @@ def _call_backplane(url, method, body = None, headers = None, extra = 0):
     if content:
         logger.debug('server response: ' + content)
 
-    if not resp['status'] in ['200', '201']:
+    if not resp.status_code in [200, 201]:
         logger.warn('server returned error: ' + content)
         if 'unauthorized scope' in content:
             raise UnauthorizedScopeError(content)
