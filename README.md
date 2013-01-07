@@ -6,7 +6,7 @@ This library integrates server side Backplane clients with the Backplane server 
 Installation
 ============
 ```shell
-pip install git+https://github.com/geokat/backplane2-pyclient
+pip install backplane2-pyclient
 ```
 
 Usage
